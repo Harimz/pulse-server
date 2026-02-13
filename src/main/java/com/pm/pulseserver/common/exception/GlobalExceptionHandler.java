@@ -39,4 +39,11 @@ public class GlobalExceptionHandler {
                 new ApiError("INTERNAL_ERROR", "Something went wrong", Map.of())
         );
     }
+
+    @ExceptionHandler(NotFoundException.class)
+    public ResponseEntity<ApiError> handleNotFound(NotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                new ApiError("NOT_FOUND", ex.getMessage(), Map.of())
+        );
+    }
 }
