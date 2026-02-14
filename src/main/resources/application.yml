@@ -1,6 +1,15 @@
 server:
   port: 8080
 
+app:
+  auth:
+    jwt-secret: "CHANGE_ME_TO_A_LONG_RANDOM_SECRET"
+    access-minutes: 15
+    refresh-days: 30
+    refresh-cookie-name: "pulse_refresh"
+    cookie-secure: false
+    cookie-same-site: "Lax"
+
 spring:
   profiles:
     active: dev
