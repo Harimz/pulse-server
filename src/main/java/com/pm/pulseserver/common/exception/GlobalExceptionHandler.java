@@ -46,4 +46,12 @@ public class GlobalExceptionHandler {
                 new ApiError("NOT_FOUND", ex.getMessage(), Map.of())
         );
     }
+
+
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ApiError> handleNotFound(BadRequestException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                new ApiError("BAD_REQUEST", ex.getMessage(), Map.of())
+        );
+    }
 }
