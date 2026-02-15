@@ -15,7 +15,8 @@ import java.util.UUID;
 @Table(
         name = "post_mentions",
         uniqueConstraints = @UniqueConstraint(name = "uq_post_mentions_post_user", columnNames = {"post_id", "mentioned_user_id"})
-)public class PostMention extends BaseEntity {
+)
+public class PostMention extends BaseEntity {
 
     @Id
     private UUID id;

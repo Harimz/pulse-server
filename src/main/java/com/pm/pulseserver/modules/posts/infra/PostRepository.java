@@ -36,4 +36,54 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
             @Param("cursorId") UUID cursorId,
             @Param("limit") int limit
     );
+
+    @Query(value = """
+    SELECT *
+    FROM posts p
+    ORDER BY p.created_at DESC, p.id DESC
+    LIMIT :limit
+    """, nativeQuery = true)
+    List<Post> findExploreFirstPage(@Param("limit") int limit);
+
+    @Query(value = """
+    SELECT *
+    FROM posts p
+    WHERE (p.created_at, p.id) < (:cursorCreatedAt, :cursorId)
+    ORDER BY p.created_at DESC, p.id DESC
+    LIMIT :limit
+    """, nativeQuery = true)
+    List<Post> findExploreAfterCursor(
+            @Param("cursorCreatedAt") Instant cursorCreatedAt,
+            @Param("cursorId") UUID cursorId,
+            @Param("limit") int limit
+    );
+
+    @Query(value = """
+    SELECT p.*
+    FROM posts p
+    JOIN follows f ON f.following_id = p.author_id
+    WHERE f.follower_id = :me
+    ORDER BY p.created_at DESC, p.id DESC
+    LIMIT :limit
+    """, nativeQuery = true)
+    List<Post> findFollowingFirstPage(
+            @Param("me") UUID me,
+            @Param("limit") int limit
+    );
+
+    @Query(value = """
+    SELECT p.*
+    FROM posts p
+    JOIN follows f ON f.following_id = p.author_id
+    WHERE f.follower_id = :me
+      AND (p.created_at, p.id) < (:cursorCreatedAt, :cursorId)
+    ORDER BY p.created_at DESC, p.id DESC
+    LIMIT :limit
+    """, nativeQuery = true)
+    List<Post> findFollowingAfterCursor(
+            @Param("me") UUID me,
+            @Param("cursorCreatedAt") Instant cursorCreatedAt,
+            @Param("cursorId") UUID cursorId,
+            @Param("limit") int limit
+    );
 }
