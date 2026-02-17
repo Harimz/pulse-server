@@ -1,5 +1,6 @@
 package com.pm.pulseserver.modules.users.app;
 
+import com.pm.pulseserver.common.cache.CacheService;
 import com.pm.pulseserver.common.exception.NotFoundException;
 import com.pm.pulseserver.modules.users.api.dto.PublicUserProfileResponse;
 import com.pm.pulseserver.modules.users.api.dto.UpdateMyProfileRequest;
@@ -11,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
 import java.util.UUID;
 
 @Service
@@ -20,26 +20,33 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final UserProfileCache cache;
+    private final CacheService cacheService;
 
-    @Transactional(readOnly = true)
     public PublicUserProfileResponse getPublicUserProfile(String username) {
-        return cache.get(username).orElseGet(() -> {
-            User user = userRepository.findByUsername(username).orElseThrow(() -> new NotFoundException("User not found"));
 
-            UserProfile profile = user.getProfile();
+        String key = "user:profile:" + username;
 
-            PublicUserProfileResponse dto = new PublicUserProfileResponse(
-                    user.getId(),
-                    user.getUsername(),
-                    profile != null ? profile.getDisplayName() : user.getUsername(),
-                    profile != null ? profile.getBio() : null,
-                    profile != null ? profile.getAvatarUrl() : null
-            );
+        var cached = cacheService.get(key, PublicUserProfileResponse.class);
+        if (cached != null) {
+            return cached;
+        }
 
-            cache.put(username, dto);
+        var user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
-            return dto;
-        });
+        UserProfile profile = user.getProfile();
+
+        PublicUserProfileResponse dto = new PublicUserProfileResponse(
+                user.getId(),
+                user.getUsername(),
+                profile != null ? profile.getDisplayName() : user.getUsername(),
+                profile != null ? profile.getBio() : null,
+                profile != null ? profile.getAvatarUrl() : null
+        );
+
+        cacheService.set(key, dto);
+
+        return dto;
     }
 
     public PublicUserProfileResponse getMyPublicUserProfile(UUID userId) {

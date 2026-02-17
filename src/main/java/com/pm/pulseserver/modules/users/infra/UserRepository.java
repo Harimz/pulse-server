@@ -13,6 +13,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @EntityGraph(attributePaths = "profile")
     Optional<User> findByUsername(String username);
+
+    @EntityGraph(attributePaths = "profile")
+    List<User> findAllByIdIn(Collection<UUID> ids);
+
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);
     Optional<User> findByEmail(String email);

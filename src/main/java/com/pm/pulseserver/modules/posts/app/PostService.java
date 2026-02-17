@@ -1,8 +1,11 @@
 package com.pm.pulseserver.modules.posts.app;
 
+import com.pm.pulseserver.common.cache.CacheService;
 import com.pm.pulseserver.common.exception.NotFoundException;
 import com.pm.pulseserver.common.pagination.CursorCodec;
 import com.pm.pulseserver.common.pagination.CursorPageResponse;
+import com.pm.pulseserver.modules.events.app.OutboxService;
+import com.pm.pulseserver.modules.events.domain.EventTypes;
 import com.pm.pulseserver.modules.posts.api.dto.PostResponse;
 import com.pm.pulseserver.modules.posts.domain.Post;
 import com.pm.pulseserver.modules.posts.domain.PostMention;
@@ -15,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -25,6 +29,8 @@ public class PostService {
     private final PostMentionRepository postMentionRepository;
     private final UserRepository userRepository;
     private final MentionService mentionService;
+    private final OutboxService outboxService;
+    private final CacheService cacheService;
 
     @Transactional
     public PostResponse createPost(UUID authorId, String body) {
@@ -42,6 +48,17 @@ public class PostService {
         for (UUID mentionedId : mentionResult.userIds()) {
             if (mentionedId.equals(authorId)) continue;
             postMentionRepository.save(new PostMention(UUID.randomUUID(), reloaded.getId(), mentionedId));
+
+            outboxService.enqueue(
+                    EventTypes.USER_MENTIONED,
+                    "POST",
+                    postId,
+                    Map.of(
+                            "postId", postId.toString(),
+                            "fromUserId", authorId.toString(),
+                            "toUserId", mentionedId.toString()
+                    )
+            );
         }
 
         return new PostResponse(
@@ -69,13 +86,27 @@ public class PostService {
     }
 
     @Transactional(readOnly = true)
-    public CursorPageResponse<PostResponse> getUserPostsByUsername(String username, String cursor, int limit) {
+    public CursorPageResponse<PostResponse> getUserPostsByUsername(
+            String username,
+            String cursor,
+            int limit
+    ) {
+
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
         limit = Math.min(Math.max(limit, 1), 50);
 
-        var posts = (cursor == null || cursor.isBlank())
+        String safeCursor = (cursor == null || cursor.isBlank()) ? "first" : cursor;
+
+        String key = "user:posts:" + user.getId() + ":" + safeCursor + ":" + limit;
+
+        var cached = cacheService.get(key, CursorPageResponse.class);
+        if (cached != null) {
+            return cached;
+        }
+
+        var posts = (safeCursor.equals("first"))
                 ? postRepository.findUserPostsFirstPage(user.getId(), limit)
                 : postRepository.findUserPostsAfterCursor(
                 user.getId(),
@@ -85,7 +116,13 @@ public class PostService {
         );
 
         var items = posts.stream()
-                .map(p -> new PostResponse(p.getId(), p.getAuthorId(), p.getBody(), p.getCreatedAt(), List.of()))
+                .map(p -> new PostResponse(
+                        p.getId(),
+                        p.getAuthorId(),
+                        p.getBody(),
+                        p.getCreatedAt(),
+                        List.of()
+                ))
                 .toList();
 
         String nextCursor = null;
@@ -94,7 +131,10 @@ public class PostService {
             nextCursor = CursorCodec.encode(last.getCreatedAt(), last.getId());
         }
 
-        return new CursorPageResponse<>(items, nextCursor);
-    }
+        var result = new CursorPageResponse<>(items, nextCursor);
 
+        cacheService.set(key, result);
+
+        return result;
+    }
 }

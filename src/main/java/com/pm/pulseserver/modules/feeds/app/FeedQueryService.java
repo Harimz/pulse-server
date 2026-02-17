@@ -1,5 +1,6 @@
 package com.pm.pulseserver.modules.feeds.app;
 
+import com.pm.pulseserver.common.cache.CacheService;
 import com.pm.pulseserver.common.pagination.CursorCodec;
 import com.pm.pulseserver.common.pagination.CursorPageResponse;
 import com.pm.pulseserver.modules.posts.api.dto.PostResponse;
@@ -17,10 +18,21 @@ import java.util.UUID;
 public class FeedQueryService {
 
     private final PostRepository postRepository;
+    private final CacheService cacheService;
 
     @Transactional(readOnly = true)
     public CursorPageResponse<PostResponse> getExplore(String cursor, int limit) {
+
         limit = clampLimit(limit);
+
+        String key = "feed:explore:" +
+                (cursor == null ? "first" : cursor) +
+                ":" + limit;
+
+        var cached = cacheService.get(key, CursorPageResponse.class);
+        if (cached != null) {
+            return cached;
+        }
 
         CursorCodec.PostCursor decoded = decodeCursor(cursor);
 
@@ -28,7 +40,11 @@ public class FeedQueryService {
                 ? postRepository.findExploreFirstPage(limit)
                 : postRepository.findExploreAfterCursor(decoded.createdAt(), decoded.id(), limit);
 
-        return toPage(posts, limit);
+        var result = toPage(posts, limit);
+
+        cacheService.set(key, result);
+
+        return result;
     }
 
     @Transactional(readOnly = true)

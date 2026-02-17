@@ -2,6 +2,9 @@ package com.pm.pulseserver.modules.follows.app;
 
 import com.pm.pulseserver.common.exception.BadRequestException;
 import com.pm.pulseserver.common.exception.NotFoundException;
+import com.pm.pulseserver.modules.events.app.OutboxService;
+import com.pm.pulseserver.modules.events.domain.EventTypes;
+import com.pm.pulseserver.modules.events.domain.OutboxStatus;
 import com.pm.pulseserver.modules.follows.domain.Follow;
 import com.pm.pulseserver.modules.follows.infra.FollowRepository;
 import com.pm.pulseserver.modules.users.infra.UserRepository;
@@ -10,6 +13,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -18,6 +22,7 @@ public class FollowService {
 
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
+    private final OutboxService outboxService;
 
     @Transactional
     public void follow(UUID me, String targetUsername) {
@@ -37,6 +42,16 @@ public class FollowService {
                     .followerId(me)
                     .followingId(target.getId())
                     .build()
+            );
+
+            outboxService.enqueue(
+                    EventTypes.USER_FOLLOWED,
+                    "FOLLOW",
+                    target.getId(),
+                    Map.of(
+                            "fromUserId", me.toString(),
+                            "toUserId", target.getId().toString()
+                    )
             );
         } catch (DataIntegrityViolationException e) {
             return;
