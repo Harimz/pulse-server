@@ -34,3 +34,5 @@ build/
 */application.properties
 design.md
 designq.md
+db-design.md
+security-design.md

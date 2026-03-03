@@ -51,6 +51,8 @@ Pulse Server is a portfolio backend for a social feed application. It provides a
 - Current handled events: `USER_FOLLOWED`, `USER_MENTIONED`.
 
 ## Database Design
+![Pulse Server ER Diagram](./pulse-er-diagram.svg)
+
 - UUID primary keys across core tables.
 - Auditable entities share `created_at` / `updated_at` via a base entity.
 - Key tables:
