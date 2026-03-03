@@ -7,5 +7,7 @@ public record PublicUserProfileResponse(
         String username,
         String displayName,
         String bio,
-        String avatarUrl
+        String avatarUrl,
+        long followers,
+        long following
 ) {}

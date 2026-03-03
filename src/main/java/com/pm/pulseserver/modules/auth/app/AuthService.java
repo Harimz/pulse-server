@@ -3,6 +3,7 @@ package com.pm.pulseserver.modules.auth.app;
 import com.pm.pulseserver.common.exception.NotFoundException;
 import com.pm.pulseserver.modules.auth.api.dto.AuthResponse;
 import com.pm.pulseserver.modules.auth.api.dto.LoginRequest;
+import com.pm.pulseserver.modules.auth.api.dto.MeResponse;
 import com.pm.pulseserver.modules.auth.api.dto.RegisterRequest;
 import com.pm.pulseserver.modules.auth.domain.RefreshSession;
 import com.pm.pulseserver.modules.auth.infra.AppAuthProperties;
@@ -111,6 +112,20 @@ public class AuthService {
         });
     }
 
+    @Transactional(readOnly = true)
+    public MeResponse me(UUID userId) {
+        var user = userRepository.findWithProfileById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        var p = user.getProfile();
+        MeResponse.Profile profile = (p == null) ? null : new MeResponse.Profile(
+                p.getDisplayName(),
+                p.getBio(),
+                p.getAvatarUrl()
+        );
+
+        return new MeResponse(user.getId(), user.getUsername(), user.getEmail(), profile);
+    }
 
     private AuthResult issueTokens(User user) {
         return issueTokens(user, null);

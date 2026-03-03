@@ -69,7 +69,7 @@ public class FollowService {
         followRepository.deleteByPair(me, target.getId());
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public FollowCounts getCounts(String username) {
         var user = userRepository.findByUsername(username).orElseThrow(() -> new NotFoundException("User not found"));
 

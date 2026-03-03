@@ -1,9 +1,9 @@
 package com.pm.pulseserver.modules.feeds.app;
 
-import com.pm.pulseserver.common.cache.CacheService;
 import com.pm.pulseserver.common.pagination.CursorCodec;
 import com.pm.pulseserver.common.pagination.CursorPageResponse;
 import com.pm.pulseserver.modules.posts.api.dto.PostResponse;
+import com.pm.pulseserver.modules.posts.app.PostReadService;
 import com.pm.pulseserver.modules.posts.domain.Post;
 import com.pm.pulseserver.modules.posts.infra.PostRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,58 +18,34 @@ import java.util.UUID;
 public class FeedQueryService {
 
     private final PostRepository postRepository;
-    private final CacheService cacheService;
+    private final PostReadService postReadService;
 
     @Transactional(readOnly = true)
-    public CursorPageResponse<PostResponse> getExplore(String cursor, int limit) {
-
+    public CursorPageResponse<PostResponse> getExplore(UUID me, String cursor, int limit) {
         limit = clampLimit(limit);
-
-        String key = "feed:explore:" +
-                (cursor == null ? "first" : cursor) +
-                ":" + limit;
-
-        var cached = cacheService.get(key, CursorPageResponse.class);
-        if (cached != null) {
-            return cached;
-        }
-
         CursorCodec.PostCursor decoded = decodeCursor(cursor);
 
         var posts = (decoded == null)
                 ? postRepository.findExploreFirstPage(limit)
                 : postRepository.findExploreAfterCursor(decoded.createdAt(), decoded.id(), limit);
 
-        var result = toPage(posts, limit);
-
-        cacheService.set(key, result);
-
-        return result;
+        return toPage(posts, limit, me, "feed:explore");
     }
 
     @Transactional(readOnly = true)
     public CursorPageResponse<PostResponse> getFollowing(UUID me, String cursor, int limit) {
         limit = clampLimit(limit);
-
         CursorCodec.PostCursor decoded = decodeCursor(cursor);
 
         var posts = (decoded == null)
                 ? postRepository.findFollowingFirstPage(me, limit)
                 : postRepository.findFollowingAfterCursor(me, decoded.createdAt(), decoded.id(), limit);
 
-        return toPage(posts, limit);
+        return toPage(posts, limit, me, "feed:following");
     }
 
-    private CursorPageResponse<PostResponse> toPage(List<Post> posts, int limit) {
-        var items = posts.stream()
-                .map(p -> new PostResponse(
-                        p.getId(),
-                        p.getAuthorId(),
-                        p.getBody(),
-                        p.getCreatedAt(),
-                        List.of()
-                ))
-                .toList();
+    private CursorPageResponse<PostResponse> toPage(List<Post> posts, int limit, UUID me, String prefix) {
+        var items = postReadService.enrich(posts, me);
 
         String nextCursor = null;
         if (posts.size() == limit) {

@@ -32,7 +32,6 @@ public class PostsFlowIT extends IntegrationTestBase {
                 .value(p -> {
                     assertThat(p).isNotNull();
                     assertThat(p.id()).isNotNull();
-                    assertThat(p.authorId()).isNotNull();
                     assertThat(p.body()).isEqualTo("This is a test post");
                     assertThat(p.createdAt()).isNotNull();
                 });

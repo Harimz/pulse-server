@@ -2,11 +2,11 @@ package com.pm.pulseserver.modules.users.app;
 
 import com.pm.pulseserver.common.cache.CacheService;
 import com.pm.pulseserver.common.exception.NotFoundException;
+import com.pm.pulseserver.modules.follows.app.FollowService;
 import com.pm.pulseserver.modules.users.api.dto.PublicUserProfileResponse;
 import com.pm.pulseserver.modules.users.api.dto.UpdateMyProfileRequest;
 import com.pm.pulseserver.modules.users.domain.User;
 import com.pm.pulseserver.modules.users.domain.UserProfile;
-import com.pm.pulseserver.modules.users.infra.UserProfileCache;
 import com.pm.pulseserver.modules.users.infra.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,8 +19,8 @@ import java.util.UUID;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final UserProfileCache cache;
     private final CacheService cacheService;
+    private final FollowService followService;
 
     public PublicUserProfileResponse getPublicUserProfile(String username) {
 
@@ -36,12 +36,16 @@ public class UserService {
 
         UserProfile profile = user.getProfile();
 
+        var followCounts = followService.getCounts(user.getUsername());
+
         PublicUserProfileResponse dto = new PublicUserProfileResponse(
                 user.getId(),
                 user.getUsername(),
                 profile != null ? profile.getDisplayName() : user.getUsername(),
                 profile != null ? profile.getBio() : null,
-                profile != null ? profile.getAvatarUrl() : null
+                profile != null ? profile.getAvatarUrl() : null,
+                followCounts.followers(),
+                followCounts.following()
         );
 
         cacheService.set(key, dto);
@@ -54,12 +58,16 @@ public class UserService {
 
         UserProfile profile = user.getProfile();
 
+        var followCounts = followService.getCounts(user.getUsername());
+
         return new PublicUserProfileResponse(
                 user.getId(),
                 user.getUsername(),
                 profile.getDisplayName(),
                 profile.getBio(),
-                profile.getAvatarUrl()
+                profile.getAvatarUrl(),
+                followCounts.followers(),
+                followCounts.following()
         );
     }
 
@@ -94,14 +102,18 @@ public class UserService {
 
         userRepository.save(user);
 
-        cache.evict(username);
+        cacheService.delete("user:profile:" + username);
+        var followCounts = followService.getCounts(username);
+
 
         return new PublicUserProfileResponse(
                 user.getId(),
                 user.getUsername(),
                 profile.getDisplayName(),
                 profile.getBio(),
-                profile.getAvatarUrl()
+                profile.getAvatarUrl(),
+                followCounts.followers(),
+                followCounts.following()
         );
     }
 }

@@ -47,11 +47,14 @@ public class UserController {
 
     @GetMapping("/{username}/posts")
     public CursorPageResponse<PostResponse> getUserPosts(
+            @AuthenticationPrincipal JwtAuthenticationFilter.AuthPrincipal principal,
             @PathVariable String username,
             @RequestParam(required = false) String cursor,
             @RequestParam(defaultValue = "20") int limit
     ) {
-        return postService.getUserPostsByUsername(username, cursor, limit);
+        UUID me = UUID.fromString(principal.userId());
+
+        return postService.getUserPostsByUsername(me, username, cursor, limit);
     }
 
     @PostMapping("/{username}/follow")

@@ -31,23 +31,31 @@ public class PostService {
     private final MentionService mentionService;
     private final OutboxService outboxService;
     private final CacheService cacheService;
+    private final PostReadService postReadService;
+
 
     @Transactional
     public PostResponse createPost(UUID authorId, String body) {
         UUID postId = UUID.randomUUID();
+
         Post post = Post.builder()
                 .id(postId)
                 .authorId(authorId)
                 .body(body)
                 .build();
+
         Post saved = postRepository.saveAndFlush(post);
+
         Post reloaded = postRepository.findById(saved.getId()).orElseThrow();
 
         var mentionResult = mentionService.extractMentionedUserIds(body);
 
         for (UUID mentionedId : mentionResult.userIds()) {
             if (mentionedId.equals(authorId)) continue;
-            postMentionRepository.save(new PostMention(UUID.randomUUID(), reloaded.getId(), mentionedId));
+
+            postMentionRepository.save(
+                    new PostMention(UUID.randomUUID(), reloaded.getId(), mentionedId)
+            );
 
             outboxService.enqueue(
                     EventTypes.USER_MENTIONED,
@@ -61,52 +69,80 @@ public class PostService {
             );
         }
 
+        for (int l : List.of(10, 20, 50)) {
+            cacheService.delete("feed:explore:first:" + l);
+            cacheService.delete("user:posts:" + authorId + ":first:" + l);
+        }
+
+        PostResponse enriched = postReadService.enrich(List.of(reloaded), null).get(0);
+
         return new PostResponse(
-                reloaded.getId(),
-                reloaded.getAuthorId(),
-                reloaded.getBody(),
-                reloaded.getCreatedAt(),
-                mentionResult.usernames()
+                enriched.id(),
+                enriched.author(),
+                enriched.body(),
+                enriched.createdAt(),
+                mentionResult.usernames(),
+                enriched.likesCount(),
+                enriched.commentCount(),
+                enriched.likedByMe()
         );
     }
 
     @Transactional(readOnly = true)
     public PostResponse getPost(UUID postId) {
-        Post post = postRepository.findById(postId).orElseThrow(() -> new NotFoundException("Post not found"));
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found"));
 
-        var mentions = postMentionRepository.findByPostId(postId);
+        PostResponse base = postReadService.enrich(List.of(post), null).get(0);
+
+        var mentionRows = postMentionRepository.findByPostId(postId);
+
+        List<String> mentions;
+        if (mentionRows.isEmpty()) {
+            mentions = List.of();
+        } else {
+            var mentionedIds = mentionRows.stream()
+                    .map(PostMention::getMentionedUserId)
+                    .distinct()
+                    .toList();
+
+            var mentionedUsers = userRepository.findAllByIdIn(mentionedIds);
+            var byId = mentionedUsers.stream()
+                    .collect(java.util.stream.Collectors.toMap(User::getId, User::getUsername));
+
+            mentions = mentionRows.stream()
+                    .map(m -> byId.get(m.getMentionedUserId()))
+                    .filter(java.util.Objects::nonNull)
+                    .distinct()
+                    .toList();
+        }
 
         return new PostResponse(
-                post.getId(),
-                post.getAuthorId(),
-                post.getBody(),
-                post.getCreatedAt(),
-                List.of()
+                base.id(),
+                base.author(),
+                base.body(),
+                base.createdAt(),
+                mentions,
+                base.likesCount(),
+                base.commentCount(),
+                base.likedByMe()
         );
     }
 
     @Transactional(readOnly = true)
-    public CursorPageResponse<PostResponse> getUserPostsByUsername(
-            String username,
-            String cursor,
-            int limit
-    ) {
-
+    public CursorPageResponse<PostResponse> getUserPostsByUsername(UUID me, String username, String cursor, int limit) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
         limit = Math.min(Math.max(limit, 1), 50);
 
         String safeCursor = (cursor == null || cursor.isBlank()) ? "first" : cursor;
-
         String key = "user:posts:" + user.getId() + ":" + safeCursor + ":" + limit;
 
         var cached = cacheService.get(key, CursorPageResponse.class);
-        if (cached != null) {
-            return cached;
-        }
+        if (cached != null) return cached;
 
-        var posts = (safeCursor.equals("first"))
+        var posts = safeCursor.equals("first")
                 ? postRepository.findUserPostsFirstPage(user.getId(), limit)
                 : postRepository.findUserPostsAfterCursor(
                 user.getId(),
@@ -115,15 +151,7 @@ public class PostService {
                 limit
         );
 
-        var items = posts.stream()
-                .map(p -> new PostResponse(
-                        p.getId(),
-                        p.getAuthorId(),
-                        p.getBody(),
-                        p.getCreatedAt(),
-                        List.of()
-                ))
-                .toList();
+        var items = postReadService.enrich(posts, me);
 
         String nextCursor = null;
         if (posts.size() == limit) {
@@ -132,9 +160,7 @@ public class PostService {
         }
 
         var result = new CursorPageResponse<>(items, nextCursor);
-
         cacheService.set(key, result);
-
         return result;
     }
 }

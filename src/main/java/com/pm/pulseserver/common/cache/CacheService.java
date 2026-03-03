@@ -44,4 +44,10 @@ public class CacheService {
     public void setLong(String key, long value) {
         redisTemplate.opsForValue().set(key, value, DEFAULT_TTL);
     }
+
+    public void deleteByPattern(String pattern) {
+        var keys = redisTemplate.keys(pattern);
+        if (keys == null || keys.isEmpty()) return;
+        redisTemplate.delete(keys);
+    }
 }

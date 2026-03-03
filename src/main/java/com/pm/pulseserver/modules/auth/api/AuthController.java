@@ -2,13 +2,16 @@ package com.pm.pulseserver.modules.auth.api;
 
 import com.pm.pulseserver.modules.auth.api.dto.AuthResponse;
 import com.pm.pulseserver.modules.auth.api.dto.LoginRequest;
+import com.pm.pulseserver.modules.auth.api.dto.MeResponse;
 import com.pm.pulseserver.modules.auth.api.dto.RegisterRequest;
 import com.pm.pulseserver.modules.auth.app.AuthService;
 import com.pm.pulseserver.modules.auth.infra.AppAuthProperties;
+import com.pm.pulseserver.modules.auth.infra.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseCookie;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -64,6 +67,13 @@ public class AuthController {
             authService.logout(UUID.fromString(sid));
         }
         clearCookies(res);
+    }
+
+
+    @GetMapping("/me")
+    public MeResponse me(@AuthenticationPrincipal JwtAuthenticationFilter.AuthPrincipal principal) {
+        UUID userId = UUID.fromString(principal.userId());
+        return authService.me(userId);
     }
 
     private void setCookies(HttpServletResponse res, UUID sessionId, String rawRefreshToken) {

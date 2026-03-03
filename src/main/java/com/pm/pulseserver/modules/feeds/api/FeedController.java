@@ -22,10 +22,12 @@ public class FeedController {
 
     @GetMapping("/explore")
     public CursorPageResponse<PostResponse> explore(
+            @AuthenticationPrincipal JwtAuthenticationFilter.AuthPrincipal principal,
             @RequestParam(required = false) String cursor,
             @RequestParam(defaultValue = "20") int limit
     ) {
-        return feedQueryService.getExplore(cursor, limit);
+        UUID me = UUID.fromString(principal.userId());
+        return feedQueryService.getExplore(me, cursor, limit);
     }
 
     @GetMapping("/following")

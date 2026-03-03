@@ -19,6 +19,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);
+
     Optional<User> findByEmail(String email);
     List<User> findAllByUsernameIn(Collection<String> usernames);
+
+    @EntityGraph(attributePaths = "profile")
+    Optional<User> findWithProfileById(UUID id);
 }

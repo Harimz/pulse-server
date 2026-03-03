@@ -6,9 +6,18 @@ import java.util.UUID;
 
 public record PostResponse(
         UUID id,
-        UUID authorId,
+        Author author,
         String body,
         Instant createdAt,
-        List<String> mentions
+        List<String> mentions,
+        long likesCount,
+        long commentCount,
+        boolean likedByMe
 ) {
+    public record Author (
+            UUID id,
+            String username,
+            String displayName,
+            String avatar
+    ) {}
 }
