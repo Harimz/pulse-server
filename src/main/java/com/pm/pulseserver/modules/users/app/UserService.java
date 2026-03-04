@@ -38,7 +38,7 @@ public class UserService {
 
         var followCounts = followService.getCounts(user.getUsername());
 
-        boolean isFollowing = followService.isFollowing(loggedInUser, user.getId());
+        boolean isFollowing = followService.isFollowing(user.getId(), loggedInUser);
 
         PublicUserProfileResponse dto = new PublicUserProfileResponse(
                 user.getId(),

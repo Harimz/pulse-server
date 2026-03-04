@@ -1,11 +1,11 @@
 package com.pm.pulseserver.common.config;
 
 import com.pm.pulseserver.modules.auth.infra.JwtAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -15,9 +15,13 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Configuration
 public class SecurityConfig {
+
+    @Value("${app.cors.allowed-origins:http://localhost:3000}")
+    private List<String> allowedOrigins;
 
     @Bean
     @Order(0)
@@ -51,9 +55,12 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowedOrigins(List.of(
-                "http://localhost:3000"
-        ));
+        config.setAllowedOrigins(
+                allowedOrigins.stream()
+                        .map(String::trim)
+                        .filter(s -> !s.isBlank())
+                        .collect(Collectors.toList())
+        );
 
         config.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
