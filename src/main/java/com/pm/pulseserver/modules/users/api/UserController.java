@@ -25,8 +25,13 @@ public class UserController {
     private final FollowService followService;
 
     @GetMapping("/{username}")
-    public PublicUserProfileResponse getPublicProfile(@PathVariable String username) {
-        return userService.getPublicUserProfile(username);
+    public PublicUserProfileResponse getPublicProfile(
+            @PathVariable String username,
+            @AuthenticationPrincipal JwtAuthenticationFilter.AuthPrincipal principal
+    ) {
+        UUID userId = UUID.fromString(principal.userId());
+
+        return userService.getPublicUserProfile(username, userId);
     }
 
     @GetMapping("/me/profile")

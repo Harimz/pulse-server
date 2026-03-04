@@ -22,9 +22,9 @@ public class UserService {
     private final CacheService cacheService;
     private final FollowService followService;
 
-    public PublicUserProfileResponse getPublicUserProfile(String username) {
+    public PublicUserProfileResponse getPublicUserProfile(String username, UUID loggedInUser) {
 
-        String key = "user:profile:" + username;
+        String key = "user:profile:" + username + ":viewer:" + loggedInUser;
 
         var cached = cacheService.get(key, PublicUserProfileResponse.class);
         if (cached != null) {
@@ -38,12 +38,15 @@ public class UserService {
 
         var followCounts = followService.getCounts(user.getUsername());
 
+        boolean isFollowing = followService.isFollowing(loggedInUser, user.getId());
+
         PublicUserProfileResponse dto = new PublicUserProfileResponse(
                 user.getId(),
                 user.getUsername(),
                 profile != null ? profile.getDisplayName() : user.getUsername(),
                 profile != null ? profile.getBio() : null,
                 profile != null ? profile.getAvatarUrl() : null,
+                isFollowing,
                 followCounts.followers(),
                 followCounts.following()
         );
@@ -66,6 +69,7 @@ public class UserService {
                 profile.getDisplayName(),
                 profile.getBio(),
                 profile.getAvatarUrl(),
+                false,
                 followCounts.followers(),
                 followCounts.following()
         );
@@ -112,6 +116,7 @@ public class UserService {
                 profile.getDisplayName(),
                 profile.getBio(),
                 profile.getAvatarUrl(),
+                false,
                 followCounts.followers(),
                 followCounts.following()
         );

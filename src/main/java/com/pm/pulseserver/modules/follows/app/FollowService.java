@@ -1,5 +1,6 @@
 package com.pm.pulseserver.modules.follows.app;
 
+import com.pm.pulseserver.common.cache.CacheService;
 import com.pm.pulseserver.common.exception.BadRequestException;
 import com.pm.pulseserver.common.exception.NotFoundException;
 import com.pm.pulseserver.modules.events.app.OutboxService;
@@ -23,10 +24,20 @@ public class FollowService {
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
     private final OutboxService outboxService;
+    private final CacheService cacheService;
+
+
+    @Transactional(readOnly = true)
+    public boolean isFollowing(UUID vistedUser, UUID loggedInUser) {
+    return followRepository.existsByFollowerIdAndFollowingId(loggedInUser, vistedUser);
+    }
 
     @Transactional
     public void follow(UUID me, String targetUsername) {
         var target = userRepository.findByUsername(targetUsername).orElseThrow(() -> new NotFoundException("User not found"));
+        var meUser = userRepository.findById(me).orElseThrow(() -> new NotFoundException("User not found"));
+
+        cacheService.deleteByPattern("user:profile:" + targetUsername + ":viewer:*");
 
         if (me.equals(target.getId())) {
             throw new BadRequestException("You cannot follow yourself");

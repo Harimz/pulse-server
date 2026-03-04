@@ -8,6 +8,7 @@ public record PublicUserProfileResponse(
         String displayName,
         String bio,
         String avatarUrl,
+        boolean isFollowing,
         long followers,
         long following
 ) {}
